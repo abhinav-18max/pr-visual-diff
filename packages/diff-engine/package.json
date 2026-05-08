@@ -1,9 +1,25 @@
 {
   "name": "@pr-visual-diff/diff-engine",
   "version": "0.1.0",
+  "description": "Image comparison engine for pr-visual-diff using pixelmatch",
   "type": "module",
+  "keywords": [
+    "pr-visual-diff",
+    "image-diff",
+    "pixelmatch"
+  ],
+  "author": "Abhinav Unnikrishnan",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abhinav-18max/pr-visual-diff.git",
+    "directory": "packages/diff-engine"
+  },
   "exports": {
     ".": "./src/index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "@pr-visual-diff/core": "workspace:*",

@@ -1,0 +1,31 @@
+# Development files
+*.test.js
+*.test.ts
+__tests__/
+test/
+tests/
+
+# Build artifacts
+*.log
+*.tgz
+node_modules/
+.DS_Store
+
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# Documentation (kept in root only)
+docs/
+examples/
+scripts/
+
+# Config files
+.eslintrc*
+.prettierrc*
+tsconfig.json
+jest.config.js
+
+# Backup files
+*.backup

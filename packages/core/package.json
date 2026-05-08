@@ -1,8 +1,24 @@
 {
   "name": "@pr-visual-diff/core",
   "version": "0.1.0",
+  "description": "Core configuration and utilities for pr-visual-diff",
   "type": "module",
+  "keywords": [
+    "pr-visual-diff",
+    "visual-regression",
+    "core"
+  ],
+  "author": "Abhinav Unnikrishnan",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abhinav-18max/pr-visual-diff.git",
+    "directory": "packages/core"
+  },
   "exports": {
     ".": "./src/index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

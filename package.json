@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "find packages -name '*.test.js' | xargs node --test"
+    "test": "find packages -name '*.test.js' | xargs node --test",
+    "publish-packages": "node scripts/publish.js"
   }
 }

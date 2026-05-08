@@ -1,12 +1,36 @@
 {
   "name": "pr-visual-diff",
   "version": "0.1.0",
+  "description": "Visual regression testing tool that catches UI changes before you push",
   "type": "module",
+  "keywords": [
+    "visual-regression",
+    "screenshot-testing",
+    "ui-testing",
+    "playwright",
+    "diff",
+    "visual-diff",
+    "regression-testing",
+    "pr-testing"
+  ],
+  "author": "Abhinav Unnikrishnan",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abhinav-18max/pr-visual-diff.git"
+  },
+  "bugs": {
+    "url": "https://github.com/abhinav-18max/pr-visual-diff/issues"
+  },
+  "homepage": "https://github.com/abhinav-18max/pr-visual-diff#readme",
   "bin": {
     "pr-visual-diff": "./src/bin.js"
   },
   "exports": {
     ".": "./src/index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "@pr-visual-diff/core": "workspace:*",

@@ -1,5 +1,8 @@
 # pr-visual-diff
 
+[![npm version](https://img.shields.io/npm/v/pr-visual-diff.svg)](https://www.npmjs.com/package/pr-visual-diff)
+[![license](https://img.shields.io/npm/l/pr-visual-diff.svg)](https://github.com/abhinav-18max/pr-visual-diff/blob/main/LICENSE)
+
 Local-first visual PR diffs for Next.js and Vite apps.
 
 `pr-visual-diff` compares your current branch against a base branch, captures screenshots across configured routes and viewports, generates pixel diffs, and writes a static HTML report you can inspect locally before pushing.
