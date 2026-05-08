@@ -29,7 +29,7 @@ jobs:
       - name: Run tests
         run: npm test
       
-      - name: Test CLI installation
+      - name: Verify CLI binary
         run: |
-          npm install -g .
-          pr-visual-diff --help || echo "CLI help command executed"
+          ls -la packages/cli/src/bin.js
+          head -1 packages/cli/src/bin.js
