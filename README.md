@@ -3,7 +3,6 @@
 [![npm version](https://img.shields.io/npm/v/pr-visual-diff.svg)](https://www.npmjs.com/package/pr-visual-diff)
 [![license](https://img.shields.io/npm/l/pr-visual-diff.svg)](https://github.com/abhinav-18max/pr-visual-diff/blob/main/LICENSE)
 [![Tests](https://github.com/abhinav-18max/pr-visual-diff/actions/workflows/test.yml/badge.svg)](https://github.com/abhinav-18max/pr-visual-diff/actions/workflows/test.yml)
-[![Publish](https://github.com/abhinav-18max/pr-visual-diff/actions/workflows/publish.yml/badge.svg)](https://github.com/abhinav-18max/pr-visual-diff/actions/workflows/publish.yml)
 
 Local-first visual PR diffs for Next.js and Vite apps.
 
