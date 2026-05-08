@@ -1,0 +1,12 @@
+{
+  "name": "pr-visual-diff-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "find packages -name '*.test.js' | xargs node --test"
+  }
+}

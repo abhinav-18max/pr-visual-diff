@@ -1,0 +1,13 @@
+{
+  "name": "@pr-visual-diff/diff-engine",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "@pr-visual-diff/core": "workspace:*",
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0"
+  }
+}

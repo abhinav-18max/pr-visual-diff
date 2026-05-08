@@ -1,0 +1,12 @@
+{
+  "name": "@pr-visual-diff/screenshots",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "@pr-visual-diff/core": "workspace:*",
+    "playwright": "^1.54.1"
+  }
+}

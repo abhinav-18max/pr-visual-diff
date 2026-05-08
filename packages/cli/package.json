@@ -1,0 +1,19 @@
+{
+  "name": "pr-visual-diff",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "pr-visual-diff": "./src/bin.js"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "@pr-visual-diff/core": "workspace:*",
+    "@pr-visual-diff/diff-engine": "workspace:*",
+    "@pr-visual-diff/git": "workspace:*",
+    "@pr-visual-diff/reporter": "workspace:*",
+    "@pr-visual-diff/runner": "workspace:*",
+    "@pr-visual-diff/screenshots": "workspace:*"
+  }
+}
