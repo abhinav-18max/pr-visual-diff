@@ -15,7 +15,7 @@ import { ensureDir, readJson, writeJson } from "./fs.js";
 import {
   detectFrameworkFromPackageJson,
   exists,
-  normalizeRoute,
+  normalizeRouteEntry,
   resolveCommandForPackageManager
 } from "./utils.js";
 
@@ -53,7 +53,7 @@ export async function buildDefaultConfig(projectRoot) {
   const port = framework === "next" ? 3000 : 4173;
 
   return {
-    baseBranch: "main",
+    baseBranch: "origin/main",
     framework,
     installCommand: resolveCommandForPackageManager(packageManager, "install", framework),
     buildCommand: resolveCommandForPackageManager(packageManager, "build", framework),
@@ -68,7 +68,8 @@ export async function buildDefaultConfig(projectRoot) {
       settleMs: DEFAULT_SETTLE_MS,
       readyTimeoutMs: DEFAULT_READY_TIMEOUT_MS,
       disableAnimations: true,
-      maskSelectors: []
+      maskSelectors: [],
+      headers: {}
     },
     diff: {
       threshold: DEFAULT_DIFF_THRESHOLD,
@@ -101,6 +102,30 @@ function validateViewport(viewport, index) {
       code: "INVALID_VIEWPORT"
     });
   }
+}
+
+function validateHeaders(headers) {
+  if (headers === undefined) {
+    return {};
+  }
+
+  if (!headers || typeof headers !== "object" || Array.isArray(headers)) {
+    throw new VisualDiffError("capture.headers must be an object of string header values", {
+      code: "INVALID_CONFIG"
+    });
+  }
+
+  return Object.fromEntries(
+    Object.entries(headers).map(([key, value]) => {
+      if (typeof value !== "string") {
+        throw new VisualDiffError(`capture.headers.${key} must be a string`, {
+          code: "INVALID_CONFIG"
+        });
+      }
+
+      return [key, value];
+    })
+  );
 }
 
 export function validateConfig(config) {
@@ -136,17 +161,29 @@ export function validateConfig(config) {
 
   config.viewports.forEach(validateViewport);
 
+  const routes = config.routes.map((route, index) => {
+    try {
+      return normalizeRouteEntry(route, index);
+    } catch (error) {
+      throw new VisualDiffError(error.message, {
+        code: "INVALID_ROUTE",
+        cause: error
+      });
+    }
+  });
+
   return {
     ...config,
     outputDir: config.outputDir ?? DEFAULT_OUTPUT_DIR,
-    routes: config.routes.map(normalizeRoute),
+    routes,
     readyUrl: config.readyUrl ?? `http://127.0.0.1:${config.port ?? 3000}`,
     capture: {
       headless: config.capture?.headless ?? true,
       settleMs: config.capture?.settleMs ?? DEFAULT_SETTLE_MS,
       readyTimeoutMs: config.capture?.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS,
       disableAnimations: config.capture?.disableAnimations ?? true,
-      maskSelectors: config.capture?.maskSelectors ?? []
+      maskSelectors: config.capture?.maskSelectors ?? [],
+      headers: validateHeaders(config.capture?.headers)
     },
     diff: {
       threshold: config.diff?.threshold ?? DEFAULT_DIFF_THRESHOLD,

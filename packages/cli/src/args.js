@@ -2,9 +2,11 @@ import { parseArgs } from "node:util";
 
 export function parseCliArgs(argv) {
   const [command = "help", ...rest] = argv;
+  const forceHeaded = rest.includes("--no-headless");
+  const normalizedArgs = rest.filter((arg) => arg !== "--no-headless");
 
   const { values } = parseArgs({
-    args: rest,
+    args: normalizedArgs,
     allowPositionals: true,
     options: {
       base: { type: "string" },
@@ -22,7 +24,7 @@ export function parseCliArgs(argv) {
     options: {
       baseBranch: values.base,
       routes: values.routes ? values.routes.split(",").map((item) => item.trim()).filter(Boolean) : undefined,
-      headless: values.headless,
+      headless: forceHeaded ? false : values.headless,
       verbose: values.verbose ?? false,
       configPath: values.config,
       outputDir: values.output,

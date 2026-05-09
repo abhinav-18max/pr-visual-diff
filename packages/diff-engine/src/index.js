@@ -71,6 +71,8 @@ export async function generateDiffArtifacts({
       route: reference.route,
       slug: reference.slug,
       viewport: reference.viewport,
+      expectedUrl: before?.expectedUrl ?? after?.expectedUrl ?? null,
+      finalUrl: after?.finalUrl ?? before?.finalUrl ?? null,
       status: "failed",
       pixelCount: null,
       diffRatio: null,

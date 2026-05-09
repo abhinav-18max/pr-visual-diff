@@ -75,6 +75,12 @@ Then install Playwright's Chromium browser (one-time, ~130 MB):
 npx playwright install chromium
 ```
 
+For CI, prefer:
+
+```bash
+npx playwright install chromium-headless-shell --with-deps
+```
+
 ---
 
 ## Project setup — Next.js
@@ -192,7 +198,7 @@ start .visual-diff/report.html     # Windows
 
 ```json
 {
-  "baseBranch": "main",
+  "baseBranch": "origin/main",
   "framework": "next",
   "installCommand": "npm install",
   "buildCommand": "npm run build",
@@ -200,7 +206,11 @@ start .visual-diff/report.html     # Windows
   "port": 3000,
   "readyUrl": "http://127.0.0.1:3000",
   "outputDir": ".visual-diff",
-  "routes": ["/", "/dashboard", "/settings"],
+  "routes": [
+    "/",
+    { "path": "/dashboard", "expectUrl": "/dashboard" },
+    "/settings"
+  ],
   "viewports": [
     { "name": "desktop", "width": 1440, "height": 900 },
     { "name": "mobile",  "width": 390,  "height": 844  }
@@ -210,7 +220,8 @@ start .visual-diff/report.html     # Windows
     "settleMs": 1200,
     "readyTimeoutMs": 60000,
     "disableAnimations": true,
-    "maskSelectors": []
+    "maskSelectors": [],
+    "headers": {}
   },
   "diff": {
     "threshold": 0.1,
@@ -226,7 +237,7 @@ start .visual-diff/report.html     # Windows
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `baseBranch` | `string` | **required** | The branch to compare against (e.g. `"main"`, `"develop"`). Must be a valid Git ref reachable from your repo. |
+| `baseBranch` | `string` | **required** | The branch to compare against. Prefer a remote ref such as `"origin/main"` so PR-style checks stay aligned with the real base branch. |
 | `framework` | `"next"` \| `"vite"` | auto-detected | Tells the tool which port and start command defaults to use. |
 | `installCommand` | `string` | auto-detected | Run once per worktree if `node_modules` is absent. E.g. `"pnpm install"`. |
 | `buildCommand` | `string` | auto-detected | Run to produce the production build inside each worktree. |
@@ -234,7 +245,7 @@ start .visual-diff/report.html     # Windows
 | `port` | `number` | `3000` (Next.js), `4173` (Vite) | Port the server listens on. Passed as `PORT` env var to build and start commands. |
 | `readyUrl` | `string` | `http://127.0.0.1:<port>` | URL polled until it returns a non-5xx response, after which screenshots begin. |
 | `outputDir` | `string` | `".visual-diff"` | Directory where `report.html`, `manifest.json`, and all images are written. Relative to project root. |
-| `routes` | `string[]` | `["/"]` | Pages to screenshot. Maximum 10. Each must start with `/`. |
+| `routes` | `Array<string \| { path: string, expectUrl?: string }>` | `["/"]` | Pages to screenshot. Maximum 10. Use route objects with `expectUrl` when you want the run to fail on unexpected redirects such as `/login`. |
 | `viewports` | `Viewport[]` | desktop + mobile | List of `{ name, width, height }` objects. At least one required. |
 
 ### `capture` fields
@@ -246,6 +257,7 @@ start .visual-diff/report.html     # Windows
 | `readyTimeoutMs` | `number` | `60000` | How long (ms) to wait for the server to become ready before giving up. Increase for slow builds on CI. |
 | `disableAnimations` | `boolean` | `true` | Injects CSS to freeze all animations and transitions. Keeps diffs clean. Disable only if you specifically want to diff animated states. |
 | `maskSelectors` | `string[]` | `[]` | CSS selectors for elements that should be blacked out before the screenshot is taken. Use for timestamps, avatars, ads, or any content that changes between runs. |
+| `headers` | `Record<string, string>` | `{}` | Extra HTTP headers sent during setup and route capture. Useful for header-based visual diff bypass contracts. |
 
 ### `diff` fields
 
@@ -301,6 +313,7 @@ Runs the full comparison. All options override the values in `.visualdiff.json` 
 | `--base <branch>` | Override `baseBranch` |
 | `--routes <csv>` | Override routes, comma-separated. E.g. `--routes /,/dashboard` |
 | `--headless` | Force headless mode |
+| `--no-headless` | Force headed mode for debugging setup and capture issues |
 | `--verbose` | Print debug output including install/build/start logs |
 | `--config <path>` | Use a config file other than `.visualdiff.json` |
 | `--output <dir>` | Override `outputDir` |
@@ -326,7 +339,7 @@ npx pr-visual-diff run --fail-on-change
 
 ## Auth and setup hooks
 
-If your app requires a login before any routes are accessible, point `auth.setupScript` to a JavaScript module in your project.
+If your app requires authentication, do not try to make `pr-visual-diff` understand your whole login stack. Keep auth policy in the app, then use `auth.setupScript` only to activate an app-owned bypass contract or deterministic fixture mode.
 
 ```json
 {
@@ -339,12 +352,14 @@ If your app requires a login before any routes are accessible, point `auth.setup
 Create `scripts/visual-diff-setup.mjs`:
 
 ```js
+import { setVisualDiffBypassCookie } from "pr-visual-diff/auth";
+
 export default async function setup({ page, baseUrl }) {
-  await page.goto(`${baseUrl}/login`);
-  await page.getByLabel("Email").fill("demo@example.com");
-  await page.getByLabel("Password").fill("password");
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL(`${baseUrl}/dashboard`);
+  await setVisualDiffBypassCookie({
+    page,
+    baseUrl,
+    secret: process.env.VISUAL_DIFF_BYPASS_SECRET
+  });
 }
 ```
 
@@ -360,11 +375,50 @@ The function receives:
 | `worktreeDir` | `string` | Absolute path to this snapshot's worktree |
 | `logger` | `Logger` | The tool's logger — use `logger.info()` for status output |
 
-After the function returns, the browser context's storage state (cookies + `localStorage`) is saved and reused for every route screenshot. Your routes will load as if the user is already logged in.
+After the function returns, the browser context's storage state (cookies + `localStorage`) is saved and reused for every route screenshot.
+
+Recommended app contract:
+
+```bash
+VISUAL_DIFF_BYPASS_AUTH=true
+VISUAL_DIFF_BYPASS_SECRET=<random-long-secret>
+VISUAL_DIFF_FIXTURE_MODE=true
+```
+
+Your app should only bypass auth when the env flag is enabled and the cookie or header secret matches. Keep secrets in ignored env files or CI secrets, never in the repository.
+
+### Header-based bypass
+
+If your app prefers a header instead of a cookie, configure it directly:
+
+```json
+{
+  "capture": {
+    "headers": {
+      "x-visual-diff-bypass": "secret-from-ci"
+    }
+  }
+}
+```
+
+### Route assertions
+
+If a protected route should stay on the same URL, declare that expectation so the run fails instead of quietly capturing `/login`:
+
+```json
+{
+  "routes": [
+    {
+      "path": "/dashboard",
+      "expectUrl": "/dashboard"
+    }
+  ]
+}
+```
 
 ### Seeding deterministic data
 
-If your routes render database-backed content, seed it inside the setup hook so both snapshots are visually identical before your change:
+If your routes render database-backed content, seed or switch to fixture mode inside the setup hook so both snapshots stay deterministic:
 
 ```js
 export default async function setup({ page, baseUrl, worktreeDir, logger }) {
@@ -372,12 +426,12 @@ export default async function setup({ page, baseUrl, worktreeDir, logger }) {
   await page.goto(`${baseUrl}/api/seed?key=visual-diff-test`);
   logger.info("Test data seeded");
 
-  // Then log in
-  await page.goto(`${baseUrl}/login`);
-  await page.getByLabel("Email").fill("test@example.com");
-  await page.getByLabel("Password").fill("testpass");
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL(`${baseUrl}/dashboard`);
+  // Then activate your bypass contract
+  await setVisualDiffBypassCookie({
+    page,
+    baseUrl,
+    secret: process.env.VISUAL_DIFF_BYPASS_SECRET
+  });
 }
 ```
 
@@ -396,6 +450,8 @@ Or use the CLI flag:
 ```bash
 npx pr-visual-diff run --no-headless --verbose
 ```
+
+The full app-side strategy is documented in [docs/authenticated-visual-diff.md](./docs/authenticated-visual-diff.md).
 
 ---
 
@@ -483,7 +539,7 @@ Route paths are slugified: `/` becomes `home`, `/dashboard` stays `dashboard`, `
 ```json
 {
   "generatedAt": "2025-05-09T10:23:00.000Z",
-  "baseBranch": "main",
+  "baseBranch": "origin/main",
   "results": [
     {
       "route": "/dashboard",
@@ -516,6 +572,7 @@ The output directory should not be committed:
 ```
 # .gitignore
 .visual-diff/
+visual-diff*.log
 ```
 
 ### Pre-push Git hook
@@ -558,13 +615,13 @@ npm run visual-diff:ci       # CI-style: fails on any change
 
 ```json
 {
-  "baseBranch": "main",
+  "baseBranch": "origin/main",
   "framework": "next",
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "startCommand": "npm run start",
   "port": 3000,
-  "routes": ["/", "/dashboard", "/settings"],
+  "routes": ["/", { "path": "/dashboard", "expectUrl": "/dashboard" }, "/settings"],
   "viewports": [
     { "name": "desktop", "width": 1440, "height": 900 },
     { "name": "mobile",  "width": 390,  "height": 844  }
@@ -574,7 +631,8 @@ npm run visual-diff:ci       # CI-style: fails on any change
     "settleMs": 1500,
     "readyTimeoutMs": 120000,
     "disableAnimations": true,
-    "maskSelectors": ["[data-testid='timestamp']", ".avatar"]
+    "maskSelectors": ["[data-testid='timestamp']", ".avatar"],
+    "headers": {}
   },
   "diff": {
     "threshold": 0.1,
@@ -608,11 +666,13 @@ The server did not respond within `readyTimeoutMs`. Common causes:
 - **Wrong host** — your `startCommand` must bind to `127.0.0.1`. For Next.js, use `next start -H 127.0.0.1`.
 - **Slow build** — increase `readyTimeoutMs` to `120000` or more.
 
+Recent app output is included in the failure message, including port conflicts like `EADDRINUSE`.
+
 ```bash
 npx pr-visual-diff run --verbose
 ```
 
-### `Command failed (build): npm run build`
+### `Command failed during build: npm run build`
 
 The build exited non-zero. The error output from the build is printed above this line. Common causes:
 
@@ -621,7 +681,7 @@ The build exited non-zero. The error output from the build is printed above this
 
 ### All routes show as `failed`
 
-Usually a sign that the auth/setup script is not completing correctly. Run with `--no-headless` and `--verbose` to watch what happens:
+Usually a sign that the auth/setup script is not completing correctly, or the route redirected to an unexpected final URL. Run with `--no-headless` and `--verbose` to watch what happens:
 
 ```bash
 npx pr-visual-diff run --no-headless --verbose
@@ -633,6 +693,20 @@ npx pr-visual-diff run --no-headless --verbose
 - **Animations not fully disabled** — CSS-in-JS libraries may inject styles after the `disableAnimations` CSS is applied. Add the animated elements to `maskSelectors`.
 - **External data** — screenshots include live API data. Seed deterministic data in a setup script or mask the dynamic elements.
 - **Dates/times** — mask any elements that render the current time.
+
+### `Failed to launch Playwright Chromium`
+
+The package is installed, but the browser binary is missing for the current machine or CI image.
+
+```bash
+npx playwright install chromium
+```
+
+For CI:
+
+```bash
+npx playwright install chromium-headless-shell --with-deps
+```
 
 ### `Config already exists` when running `init`
 

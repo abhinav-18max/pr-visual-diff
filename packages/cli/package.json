@@ -1,6 +1,6 @@
 {
   "name": "pr-visual-diff",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Visual regression testing tool that catches UI changes before you push",
   "type": "module",
   "keywords": [
@@ -27,17 +27,18 @@
     "pr-visual-diff": "./src/bin.js"
   },
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./auth": "./src/auth.js"
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@pr-visual-diff/core": "workspace:*",
-    "@pr-visual-diff/diff-engine": "workspace:*",
-    "@pr-visual-diff/git": "workspace:*",
-    "@pr-visual-diff/reporter": "workspace:*",
-    "@pr-visual-diff/runner": "workspace:*",
-    "@pr-visual-diff/screenshots": "workspace:*"
+    "@pr-visual-diff/core": "*",
+    "@pr-visual-diff/diff-engine": "*",
+    "@pr-visual-diff/git": "*",
+    "@pr-visual-diff/reporter": "*",
+    "@pr-visual-diff/runner": "*",
+    "@pr-visual-diff/screenshots": "*"
   }
 }

@@ -13,7 +13,7 @@ Local-first visual PR diffs for Next.js and Vite apps.
 - Builds and starts the app in **production-like mode** for more stable screenshots.
 - Captures **desktop and mobile** screenshots with Playwright.
 - Generates `before.png`, `after.png`, `diff.png`, plus a local `report.html`.
-- Supports a simple **auth/setup hook** for login flows or deterministic seeding.
+- Supports an app-owned **auth/setup hook** for bypass cookies, headers, or deterministic seeding.
 
 ## MVP constraints
 
@@ -41,7 +41,7 @@ npx pr-visual-diff init
 
 ```json
 {
-  "baseBranch": "main",
+  "baseBranch": "origin/main",
   "framework": "next",
   "installCommand": "npm install",
   "buildCommand": "npm run build",
@@ -49,7 +49,10 @@ npx pr-visual-diff init
   "port": 3000,
   "readyUrl": "http://127.0.0.1:3000",
   "outputDir": ".visual-diff",
-  "routes": ["/", "/dashboard"],
+  "routes": [
+    "/",
+    { "path": "/dashboard", "expectUrl": "/dashboard" }
+  ],
   "viewports": [
     { "name": "desktop", "width": 1440, "height": 900 },
     { "name": "mobile", "width": 390, "height": 844 }
@@ -59,7 +62,8 @@ npx pr-visual-diff init
     "settleMs": 1200,
     "readyTimeoutMs": 60000,
     "disableAnimations": true,
-    "maskSelectors": []
+    "maskSelectors": [],
+    "headers": {}
   },
   "diff": {
     "threshold": 0.1,
@@ -108,7 +112,7 @@ npx pr-visual-diff doctor
 Runs the full branch-to-branch visual comparison.
 
 ```bash
-npx pr-visual-diff run --base main --routes /,/dashboard --headless --verbose
+npx pr-visual-diff run --base origin/main --routes /,/dashboard --headless --verbose
 ```
 
 Options:
@@ -116,6 +120,7 @@ Options:
 - `--base <branch>`
 - `--routes <csv>`
 - `--headless`
+- `--no-headless`
 - `--verbose`
 - `--config <path>`
 - `--output <dir>`
@@ -123,7 +128,7 @@ Options:
 
 ## Auth/setup hook
 
-If your app needs login or state seeding, point `auth.setupScript` to a module inside your app repository. It should export a default async function that receives:
+If your app needs authenticated screenshots, keep auth policy in the app and use `auth.setupScript` only to activate that app-owned contract. The module should export a default async function that receives:
 
 - `browser`
 - `context`
@@ -136,16 +141,20 @@ If your app needs login or state seeding, point `auth.setupScript` to a module i
 Example:
 
 ```js
+import { setVisualDiffBypassCookie } from "pr-visual-diff/auth";
+
 export default async function setup({ page, baseUrl }) {
-  await page.goto(`${baseUrl}/login`);
-  await page.getByLabel("Email").fill("demo@example.com");
-  await page.getByLabel("Password").fill("password");
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL(`${baseUrl}/dashboard`);
+  await setVisualDiffBypassCookie({
+    page,
+    baseUrl,
+    secret: process.env.VISUAL_DIFF_BYPASS_SECRET
+  });
 }
 ```
 
 The setup context storage state is reused for subsequent route captures.
+
+If you prefer headers, set `capture.headers` in `.visualdiff.json`. For the full bypass contract, fixture-mode guidance, and CI setup, see [docs/authenticated-visual-diff.md](./docs/authenticated-visual-diff.md).
 
 ## Output
 
@@ -195,4 +204,3 @@ This repository uses npm workspaces. After installing dependencies:
 npm install
 npm test
 ```
-

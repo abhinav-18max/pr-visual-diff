@@ -5,6 +5,30 @@ import process from "node:process";
 
 import { VisualDiffError, exists } from "@pr-visual-diff/core";
 
+function createLogBuffer(limit = 40) {
+  const lines = [];
+
+  return {
+    push(chunk) {
+      const text = chunk.toString().trimEnd();
+      if (!text) {
+        return;
+      }
+
+      lines.push(...text.split("\n"));
+      if (lines.length > limit) {
+        lines.splice(0, lines.length - limit);
+      }
+    },
+    toString() {
+      return lines.join("\n");
+    },
+    includes(value) {
+      return lines.some((line) => line.includes(value));
+    }
+  };
+}
+
 function buildSpawnOptions(cwd, extraEnv = {}) {
   return {
     cwd,
@@ -22,16 +46,18 @@ export async function runCommand(command, options) {
 
   await new Promise((resolve, reject) => {
     const child = spawn(command, [], buildSpawnOptions(cwd, env));
-    const stderrLines = [];
+    const stderrBuffer = createLogBuffer();
+    const stdoutBuffer = createLogBuffer();
 
     child.stdout.on("data", (chunk) => {
+      stdoutBuffer.push(chunk);
       logger.debug(`[${label}] ${chunk.toString().trimEnd()}`);
     });
 
     child.stderr.on("data", (chunk) => {
       const text = chunk.toString().trimEnd();
       logger.debug(`[${label}] ${text}`);
-      stderrLines.push(text);
+      stderrBuffer.push(chunk);
     });
 
     child.on("error", (error) => {
@@ -49,10 +75,10 @@ export async function runCommand(command, options) {
         return;
       }
 
-      const detail = stderrLines.slice(-10).join("\n");
+      const detail = stderrBuffer.toString() || stdoutBuffer.toString();
       reject(
         new VisualDiffError(
-          `Command failed (${label}): ${command}${detail ? `\n${detail}` : ""}`,
+          `Command failed during ${label}: ${command}\nWorking directory: ${cwd}${detail ? `\n\nRecent output:\n${detail}` : ""}`,
           { code: "COMMAND_FAILED" }
         )
       );
@@ -78,6 +104,7 @@ export async function ensureDependenciesInstalled(cwd, installCommand, logger) {
 async function waitForReady(readyUrl, timeoutMs, logger) {
   const start = Date.now();
   let lastError = null;
+  let lastStatus = null;
 
   while (Date.now() - start < timeoutMs) {
     try {
@@ -85,6 +112,8 @@ async function waitForReady(readyUrl, timeoutMs, logger) {
         method: "GET",
         redirect: "manual"
       });
+
+      lastStatus = response.status;
 
       if (response.status < 500) {
         return;
@@ -96,7 +125,8 @@ async function waitForReady(readyUrl, timeoutMs, logger) {
     await delay(500);
   }
 
-  throw new VisualDiffError(`Could not detect server readiness at ${readyUrl}`, {
+  const statusDetail = lastStatus ? ` Last HTTP status: ${lastStatus}.` : "";
+  throw new VisualDiffError(`Could not detect server readiness at ${readyUrl}.${statusDetail}`, {
     code: "READY_TIMEOUT",
     cause: lastError
   });
@@ -144,6 +174,7 @@ export async function startApplication({
   logger
 }) {
   logger.info(`Starting app in ${cwd}`);
+  const logBuffer = createLogBuffer();
 
   const child = spawn(startCommand, [], {
     ...buildSpawnOptions(cwd, {
@@ -154,10 +185,12 @@ export async function startApplication({
   });
 
   child.stdout.on("data", (chunk) => {
+    logBuffer.push(chunk);
     logger.debug(`[app] ${chunk.toString().trimEnd()}`);
   });
 
   child.stderr.on("data", (chunk) => {
+    logBuffer.push(chunk);
     logger.debug(`[app] ${chunk.toString().trimEnd()}`);
   });
 
@@ -168,9 +201,36 @@ export async function startApplication({
   const kill = createKillHandler(child);
 
   try {
-    await waitForReady(readyUrl, readyTimeoutMs, logger);
+    await Promise.race([
+      waitForReady(readyUrl, readyTimeoutMs, logger),
+      new Promise((_, reject) => {
+        child.on("exit", (code, signal) => {
+          reject(
+            new VisualDiffError(
+              `App exited before it became ready: ${startCommand}\nWorking directory: ${cwd}${logBuffer.toString() ? `\n\nRecent output:\n${logBuffer.toString()}` : ""}`,
+              {
+                code: "APP_EXITED_EARLY",
+                cause: new Error(`exit code ${code ?? "unknown"}${signal ? ` (${signal})` : ""}`)
+              }
+            )
+          );
+        });
+      })
+    ]);
   } catch (error) {
     await kill();
+    if (error instanceof VisualDiffError && error.code === "READY_TIMEOUT") {
+      const hint = logBuffer.includes("EADDRINUSE")
+        ? " Port is already in use. Pick a different port or stop the existing server."
+        : "";
+      throw new VisualDiffError(
+        `${error.message}${hint}${logBuffer.toString() ? `\n\nRecent app output:\n${logBuffer.toString()}` : ""}`,
+        {
+          code: error.code,
+          cause: error.cause ?? error
+        }
+      );
+    }
     throw error;
   }
 

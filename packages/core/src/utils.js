@@ -15,6 +15,36 @@ export function slugifyRoute(route) {
     .replace(/^[-_]+|[-_]+$/g, "") || "route";
 }
 
+export function normalizeRoutePath(route) {
+  if (!route.startsWith("/")) {
+    return `/${route}`;
+  }
+
+  return route;
+}
+
+export function normalizeRouteEntry(route, index = 0) {
+  if (typeof route === "string") {
+    return {
+      path: normalizeRoutePath(route),
+      expectUrl: null
+    };
+  }
+
+  if (typeof route?.path !== "string" || route.path.length === 0) {
+    throw new Error(`Route at index ${index} is invalid`);
+  }
+
+  return {
+    path: normalizeRoutePath(route.path),
+    expectUrl: route.expectUrl
+      ? route.expectUrl.startsWith("http://") || route.expectUrl.startsWith("https://")
+        ? route.expectUrl
+        : normalizeRoutePath(route.expectUrl)
+      : null
+  };
+}
+
 export function mergeConfig(baseConfig, overrides) {
   const nextConfig = structuredClone(baseConfig);
 
@@ -113,11 +143,7 @@ export function detectFrameworkFromPackageJson(packageJson) {
 }
 
 export function normalizeRoute(route) {
-  if (!route.startsWith("/")) {
-    return `/${route}`;
-  }
-
-  return route;
+  return normalizeRoutePath(route);
 }
 
 export function formatDuration(startTime) {

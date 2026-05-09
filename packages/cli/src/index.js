@@ -18,6 +18,7 @@ Options:
   --base <branch>
   --routes </,/dashboard>
   --headless
+  --no-headless
   --verbose
   --config <path>
   --output <dir>

@@ -1,7 +1,9 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { ensureDir, slugifyRoute } from "@pr-visual-diff/core";
+import { ensureDir, slugifyRoute, VisualDiffError } from "@pr-visual-diff/core";
+
+export { setVisualDiffBypassCookie } from "./auth.js";
 
 const DISABLE_ANIMATIONS_CSS = `
   *,
@@ -16,6 +18,16 @@ const DISABLE_ANIMATIONS_CSS = `
 
 async function loadPlaywright() {
   return import("playwright");
+}
+
+function formatExpectedUrl(baseUrl, expectedUrl) {
+  if (!expectedUrl) {
+    return "";
+  }
+
+  return expectedUrl.startsWith("http://") || expectedUrl.startsWith("https://")
+    ? expectedUrl
+    : new URL(expectedUrl, baseUrl).toString();
 }
 
 async function loadSetupScript(setupScriptPath) {
@@ -40,6 +52,7 @@ async function runSetupHook({
   baseUrl,
   snapshotDir,
   worktreeDir,
+  headers,
   logger
 }) {
   if (!setupScript) {
@@ -48,7 +61,9 @@ async function runSetupHook({
 
   logger.info(`Running auth/setup hook: ${setupScriptPath}`);
 
-  const context = await browser.newContext();
+  const context = await browser.newContext({
+    extraHTTPHeaders: headers
+  });
   const page = await context.newPage();
 
   try {
@@ -90,17 +105,29 @@ export async function captureSnapshotSet({
   outputDir,
   logger
 }) {
-  const { chromium } = await loadPlaywright();
-  const browser = await chromium.launch({
-    headless: capture.headless
-  });
+  let browser;
+
+  try {
+    const { chromium } = await loadPlaywright();
+    browser = await chromium.launch({
+      headless: capture.headless
+    });
+  } catch (error) {
+    throw new VisualDiffError(
+      "Failed to launch Playwright Chromium. Install the browser with 'npx playwright install chromium' locally or 'npx playwright install chromium-headless-shell --with-deps' in CI.",
+      {
+        code: "BROWSER_LAUNCH_FAILED",
+        cause: error
+      }
+    );
+  }
 
   const setupScriptPath = auth.setupScript
     ? path.resolve(worktreeDir, auth.setupScript)
     : "";
-  const setupScript = await loadSetupScript(setupScriptPath);
 
   try {
+    const setupScript = await loadSetupScript(setupScriptPath);
     const storageState = await runSetupHook({
       browser,
       setupScript,
@@ -108,13 +135,14 @@ export async function captureSnapshotSet({
       baseUrl,
       snapshotDir: outputDir,
       worktreeDir,
+      headers: capture.headers,
       logger
     });
 
     const results = [];
 
-    for (const route of routes) {
-      const slug = slugifyRoute(route);
+    for (const routeEntry of routes) {
+      const slug = slugifyRoute(routeEntry.path);
 
       for (const viewport of viewports) {
         const routeDir = path.join(outputDir, slug, viewport.name);
@@ -123,16 +151,19 @@ export async function captureSnapshotSet({
         await ensureDir(routeDir);
 
         try {
+          let finalUrl = null;
+
           const context = await browser.newContext({
             viewport: { width: viewport.width, height: viewport.height },
-            storageState: storageState ?? undefined
+            storageState: storageState ?? undefined,
+            extraHTTPHeaders: capture.headers
           });
 
           try {
             const page = await context.newPage();
 
             await page.emulateMedia({ reducedMotion: "reduce" });
-            await page.goto(new URL(route, baseUrl).toString(), {
+            await page.goto(new URL(routeEntry.path, baseUrl).toString(), {
               waitUntil: "load"
             });
 
@@ -142,6 +173,16 @@ export async function captureSnapshotSet({
 
             if (capture.settleMs > 0) {
               await page.waitForTimeout(capture.settleMs);
+            }
+
+            finalUrl = page.url();
+            const expectedUrl = formatExpectedUrl(baseUrl, routeEntry.expectUrl);
+
+            if (expectedUrl && finalUrl !== expectedUrl) {
+              throw new VisualDiffError(
+                `Route ${routeEntry.path} resolved to ${finalUrl}, expected ${expectedUrl}. If this route should stay authenticated, configure auth.setupScript or capture.headers for your visual diff bypass.`,
+                { code: "UNEXPECTED_FINAL_URL" }
+              );
             }
 
             const mask = await createMaskLocators(page, capture.maskSelectors);
@@ -155,22 +196,26 @@ export async function captureSnapshotSet({
           }
 
           results.push({
-            route,
+            route: routeEntry.path,
             slug,
             viewport,
             snapshotName,
             screenshotPath,
-            status: "captured"
+            status: "captured",
+            expectedUrl: routeEntry.expectUrl,
+            finalUrl
           });
         } catch (error) {
-          logger.warn(`Failed to capture ${route} (${viewport.name}) on ${snapshotName}`);
+          logger.warn(`Failed to capture ${routeEntry.path} (${viewport.name}) on ${snapshotName}`);
           results.push({
-            route,
+            route: routeEntry.path,
             slug,
             viewport,
             snapshotName,
             screenshotPath,
             status: "failed",
+            expectedUrl: routeEntry.expectUrl,
+            finalUrl: null,
             error: error.message
           });
         }

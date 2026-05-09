@@ -4,7 +4,7 @@ Use this folder for a minimal Next.js demo app that exercises:
 
 - `/`
 - `/dashboard`
-- an optional login flow for `auth.setupScript`
+- an optional visual diff bypass contract for `auth.setupScript`
 
 Suggested scripts:
 

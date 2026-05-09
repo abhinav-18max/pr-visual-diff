@@ -20,6 +20,12 @@ function renderResultCard(result) {
   const errorHtml = result.error
     ? `<p class="error">${escapeHtml(result.error)}</p>`
     : "";
+  const expectationHtml = result.expectedUrl
+    ? `<p class="metric">Expected final URL: ${escapeHtml(result.expectedUrl)}</p>`
+    : "";
+  const finalUrlHtml = result.finalUrl
+    ? `<p class="metric">Observed final URL: ${escapeHtml(result.finalUrl)}</p>`
+    : "";
 
   const beforeImage = result.hasBefore
     ? `<img src="${escapeHtml(result.beforePath)}" alt="Before screenshot for ${escapeHtml(result.route)} ${escapeHtml(result.viewport.name)}" />`
@@ -43,6 +49,8 @@ function renderResultCard(result) {
         <span class="badge badge--${escapeHtml(result.status)}">${escapeHtml(result.status)}</span>
       </div>
       <p class="metric">${escapeHtml(metricText)}</p>
+      ${expectationHtml}
+      ${finalUrlHtml}
       ${errorHtml}
       <div class="grid">
         <figure>

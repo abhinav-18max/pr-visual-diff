@@ -1,6 +1,6 @@
 {
   "name": "@pr-visual-diff/diff-engine",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Image comparison engine for pr-visual-diff using pixelmatch",
   "type": "module",
   "keywords": [
@@ -22,7 +22,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@pr-visual-diff/core": "workspace:*",
+    "@pr-visual-diff/core": "*",
     "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0"
   }

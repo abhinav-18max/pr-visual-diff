@@ -1,6 +1,6 @@
 {
   "name": "@pr-visual-diff/screenshots",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Playwright-based screenshot capture for pr-visual-diff",
   "type": "module",
   "keywords": [
@@ -22,7 +22,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@pr-visual-diff/core": "workspace:*",
+    "@pr-visual-diff/core": "*",
     "playwright": "^1.54.1"
   }
 }
